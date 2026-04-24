@@ -491,32 +491,94 @@ def undone_todo(todo_id):
 
 
 @app.route("/member/<int:todo_id>/<int:member_index>")
-def toggle_member(todo_id, member_index):
-    """切换成员完成状态"""
+def member_page(todo_id, member_index):
+    """成员确认页面（防止误触）"""
     todos = read_todos()
 
     for t in todos:
         if t["id"] == todo_id:
             members = t.get("members", [])
-
             if 0 <= member_index < len(members):
-                members[member_index]["done"] = not members[member_index]["done"]
+                member = members[member_index]
+
+                # 如果已经完成，显示提示
+                if member.get("done", False):
+                    return redirect("/?message={} 已经完成了，无需重复操作&type=error".format(member["name"]))
+
+                # 显示确认页面
+                html = '''
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>确认完成</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; text-align: center; }
+        .card { background: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 50px; }
+        h1 { color: #333; margin-bottom: 20px; font-size: 24px; }
+        .task-name { font-size: 18px; color: #666; margin-bottom: 30px; padding: 15px; background: #f5f5f5; border-radius: 8px; }
+        .member-name { color: #667eea; font-weight: bold; font-size: 22px; }
+        .btn { display: inline-block; padding: 15px 40px; background: #52c41a; color: white; text-decoration: none; border-radius: 8px; font-size: 16px; border: none; cursor: pointer; }
+        .btn:hover { background: #73d13d; }
+        .btn-cancel { background: #999; margin-left: 15px; }
+        .btn-cancel:hover { background: #888; }
+        .warning { color: #ff4d4f; font-size: 14px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>✅ 确认完成任务</h1>
+            <div class="task-name">''' + t["content"] + '''</div>
+            <p>确认由 <span class="member-name">''' + member["name"] + '''</span> 完成？</p>
+            <div style="margin-top: 30px;">
+                <a href="/member/confirm/''' + str(todo_id) + '''/''' + str(member_index) + '''" class="btn">确认完成</a>
+                <a href="/" class="btn btn-cancel">取消</a>
+            </div>
+            <p class="warning">* 确认后无法撤销，请谨慎操作</p>
+        </div>
+    </div>
+</body>
+</html>
+'''
+                return html
+
+    return redirect("/?message=未找到该成员&type=error")
+
+
+@app.route("/member/confirm/<int:todo_id>/<int:member_index>")
+def confirm_member(todo_id, member_index):
+    """确认标记成员完成"""
+    todos = read_todos()
+
+    for t in todos:
+        if t["id"] == todo_id:
+            members = t.get("members", [])
+            if 0 <= member_index < len(members):
+                member = members[member_index]
+
+                # 如果已经完成，不允许重复操作
+                if member.get("done", False):
+                    return redirect("/?message={} 已经完成了&type=error".format(member["name"]))
+
+                # 标记完成
+                members[member_index]["done"] = True
                 write_todos(todos)
-                name = members[member_index]["name"]
-                done_status = "已完成" if members[member_index]["done"] else "未完成"
+                name = member["name"]
 
-                # 如果有人标记为完成，检查是否全员完成
-                if members[member_index]["done"]:
-                    all_done = all(m.get("done", False) for m in members)
-                    if all_done:
-                        # 全员完成，自动推送钉钉
-                        t["done"] = True
-                        write_todos(todos)
-                        message = build_dingtalk_message(todos)
-                        send_to_dingtalk(message)
-                        return redirect("/?message={}：{}！全员完成，已推送钉钉群！&type=success".format(name, done_status))
+                # 检查是否全员完成
+                all_done = all(m.get("done", False) for m in members)
+                if all_done:
+                    t["done"] = True
+                    write_todos(todos)
+                    message = build_dingtalk_message(todos)
+                    send_to_dingtalk(message)
+                    return redirect("/?message={}：已完成！全员完成，已推送钉钉群！&type=success".format(name))
 
-                return redirect("/?message={}：{}&type=success".format(name, done_status))
+                return redirect("/?message={}：已完成&type=success".format(name))
 
     return redirect("/?message=未找到该成员&type=error")
 
