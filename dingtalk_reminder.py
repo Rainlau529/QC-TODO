@@ -179,17 +179,35 @@ def build_dingtalk_message(todos, base_url="https://dingtalk-reminder.onrender.c
 
 
 def send_to_dingtalk(message):
-    """发送消息到钉钉"""
+    """发送消息到钉钉（支持多群）"""
     if not DINGTALK_WEBHOOK:
         return False, "钉钉 Webhook 未配置"
-    try:
-        response = requests.post(DINGTALK_WEBHOOK, json=message, timeout=10)
-        result = response.json()
-        if result.get("errcode") == 0:
-            return True, "发送成功"
-        return False, f"发送失败：{result.get('errmsg', '未知错误')}"
-    except Exception as e:
-        return False, f"请求异常：{str(e)}"
+
+    # 支持多个 Webhook，用逗号分隔
+    webhooks = [w.strip() for w in DINGTALK_WEBHOOK.split(",") if w.strip()]
+    if not webhooks:
+        return False, "钉钉 Webhook 未配置"
+
+    success_count = 0
+    fail_messages = []
+
+    for webhook in webhooks:
+        try:
+            response = requests.post(webhook, json=message, timeout=10)
+            result = response.json()
+            if result.get("errcode") == 0:
+                success_count += 1
+            else:
+                fail_messages.append(f"{webhook[:30]}...: {result.get('errmsg', '未知错误')}")
+        except Exception as e:
+            fail_messages.append(f"{webhook[:30]}...: {str(e)}")
+
+    if success_count == len(webhooks):
+        return True, f"已推送到 {success_count} 个群"
+    elif success_count > 0:
+        return True, f"成功 {success_count} 个群，失败 {len(webhooks) - success_count} 个群"
+    else:
+        return False, "发送失败：" + "; ".join(fail_messages[:3])
 
 
 # HTML 模板
