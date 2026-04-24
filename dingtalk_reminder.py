@@ -108,7 +108,6 @@ def build_dingtalk_message(todos, base_url="https://dingtalk-reminder.onrender.c
         }
 
     undone = [t for t in todos if not t.get("done", False)]
-    done = [t for t in todos if t.get("done", False)]
     priority_order = {"high": 0, "important": 1, "normal": 2}
     undone.sort(key=lambda x: (priority_order.get(x.get("priority", "normal"), 2), x.get("deadline", "")))
 
@@ -169,12 +168,6 @@ def build_dingtalk_message(todos, base_url="https://dingtalk-reminder.onrender.c
                 content += " ".join(member_links) + "\n"
 
         content += "\n"
-
-    # 已完成
-    if done:
-        content += "### ✅ 已完成\n"
-        for t in done:
-            content += f"- ~~{t.get('deadline', '')} {t['content']}~~\n"
 
     return {
         "msgtype": "markdown",
