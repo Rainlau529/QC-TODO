@@ -493,27 +493,37 @@ def undone_todo(todo_id):
 def toggle_member(todo_id, member_index):
     """切换成员完成状态"""
     todos = read_todos()
+    print(f"[DEBUG] toggle_member: todo_id={todo_id}, member_index={member_index}")
+
     for t in todos:
         if t["id"] == todo_id:
             members = t.get("members", [])
+            print(f"[DEBUG] Found todo, members={members}")
+            print(f"[DEBUG] Member at index {member_index}: {members[member_index] if member_index < len(members) else 'OUT OF RANGE'}")
+
             if 0 <= member_index < len(members):
                 members[member_index]["done"] = not members[member_index]["done"]
                 write_todos(todos)
                 name = members[member_index]["name"]
                 done_status = "已完成" if members[member_index]["done"] else "未完成"
+                print(f"[DEBUG] Toggled member '{name}' to done={members[member_index]['done']}")
 
                 # 如果有人标记为完成，检查是否全员完成
                 if members[member_index]["done"]:
                     all_done = all(m.get("done", False) for m in members)
+                    print(f"[DEBUG] All done check: {all_done}, members status={[m.get('done') for m in members]}")
                     if all_done:
                         # 全员完成，自动推送钉钉
                         t["done"] = True
                         write_todos(todos)
                         message = build_dingtalk_message(todos)
                         send_to_dingtalk(message)
+                        print(f"[DEBUG] All members done, sending notification")
                         return redirect("/?message={}：{}！全员完成，已推送钉钉群！&type=success".format(name, done_status))
 
                 return redirect("/?message={}：{}&type=success".format(name, done_status))
+
+    print(f"[DEBUG] Member not found")
     return redirect("/?message=未找到该成员&type=error")
 
 
